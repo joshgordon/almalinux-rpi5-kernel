@@ -28,26 +28,51 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Query available kernel version from repos
+        id: query
+        run: |
+          BASE_IMAGE=$(awk '/^FROM.*AS builder/{print $2; exit}' Containerfile)
+          VERSION=$(docker run --rm "$BASE_IMAGE" \
+            dnf repoquery --source --qf '%{VERSION}-%{RELEASE}' raspberrypi2-kernel4 2>/dev/null | tail -1)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Available: $VERSION"
+
+      - name: Check currently published version
+        id: check
+        run: |
+          CURRENT=$(skopeo inspect "docker://${{ env.IMAGE }}:latest" 2>/dev/null \
+            | jq -r '.Labels["kernel.version"] // ""')
+          AVAILABLE="${{ steps.query.outputs.version }}"
+          echo "Current:   ${CURRENT:-none}"
+          echo "Available: $AVAILABLE"
+          if [ -n "$AVAILABLE" ] && [ "$CURRENT" = "$AVAILABLE" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Version unchanged — skipping build"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Buildx
+        if: steps.check.outputs.skip != 'true'
         uses: docker/setup-buildx-action@v4
 
       - name: Build and push
+        if: steps.check.outputs.skip != 'true'
         uses: docker/build-push-action@v7
         with:
           context: .
           file: Containerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: |
-            ${{ env.IMAGE }}:latest
-            ${{ env.IMAGE }}:${{ github.sha }}
+          tags: ${{ env.IMAGE }}:latest
+          labels: kernel.version=${{ steps.query.outputs.version }}
           platforms: linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Install cosign
-        if: github.event_name != 'pull_request'
+        if: steps.check.outputs.skip != 'true' && github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@v4.1.2
 
       - name: Sign image
-        if: github.event_name != 'pull_request'
+        if: steps.check.outputs.skip != 'true' && github.event_name != 'pull_request'
         run: cosign sign --yes "${{ env.IMAGE }}:latest"
