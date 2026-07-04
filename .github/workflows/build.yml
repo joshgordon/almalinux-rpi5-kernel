@@ -1,0 +1,52 @@
+name: Build BCM2712 kernel RPMs
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 0"  # weekly — kernel packages don't change often
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          platforms: linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install cosign
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@v4.1.2
+
+      - name: Sign image
+        if: github.event_name != 'pull_request'
+        run: cosign sign --yes "${{ env.IMAGE }}:latest"
