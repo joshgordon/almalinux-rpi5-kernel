@@ -24,5 +24,6 @@ RUN rpm2cpio /rpms/raspberrypi2-kernel4-6.12*.rpm | cpio -i --to-stdout './boot/
     grep -q '^CONFIG_ARM64_16K_PAGES=y$' /tmp/kcfg || { echo 'not 16K pages'; exit 1; } && \
     rm /tmp/kcfg
 
+# export only the built RPMs; no build tooling in the final image
 FROM scratch
 COPY --from=builder /rpms/ /rpms/
