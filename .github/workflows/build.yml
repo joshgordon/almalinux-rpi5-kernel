@@ -35,7 +35,11 @@ jobs:
         run: |
           BASE_IMAGE=$(awk '/^FROM.*AS builder/{print $2; exit}' Containerfile)
           VERSION=$(docker run --rm "$BASE_IMAGE" \
-            dnf repoquery --source --qf '%{VERSION}-%{RELEASE}' raspberrypi2-kernel4 2>/dev/null | tail -1)
+            dnf -y repoquery --source --qf '%{VERSION}-%{RELEASE}' raspberrypi2-kernel4 2>/dev/null | tail -1)
+          if ! [[ "$VERSION" =~ ^[0-9] ]]; then
+            echo "::error::repoquery returned something that doesn't look like a version: '$VERSION'"
+            exit 1
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Available: $VERSION"
 
