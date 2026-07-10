@@ -34,10 +34,20 @@ jobs:
         id: query
         run: |
           BASE_IMAGE=$(awk '/^FROM.*AS builder/{print $2; exit}' Containerfile)
-          VERSION=$(docker run --rm "$BASE_IMAGE" \
-            dnf -y repoquery --source --qf '%{VERSION}-%{RELEASE}' raspberrypi2-kernel4 2>/dev/null | tail -1)
+          # Mirror the Containerfile's own setup (epel-release + crb enable) instead of
+          # querying a pristine container: raspberrypi2-kernel4's repo isn't fully usable
+          # until that setup runs, so a bare `dnf repoquery` on the raw base image can't
+          # reliably resolve it. Downloading the source RPM and reading its header is also
+          # more robust than parsing repoquery's --qf output.
+          VERSION=$(timeout 300 docker run --rm "$BASE_IMAGE" bash -c '
+            set -e
+            dnf install -y epel-release dnf-plugins-core >/dev/null
+            crb enable >/dev/null
+            dnf download -y --source --destdir /tmp raspberrypi2-kernel4 >/dev/null
+            rpm -qp --qf "%{VERSION}-%{RELEASE}" /tmp/raspberrypi2-*.src.rpm
+          ')
           if ! [[ "$VERSION" =~ ^[0-9] ]]; then
-            echo "::error::repoquery returned something that doesn't look like a version: '$VERSION'"
+            echo "::error::Could not determine the available kernel version (got: '$VERSION')"
             exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
