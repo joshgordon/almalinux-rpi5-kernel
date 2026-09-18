@@ -4,10 +4,19 @@ ENV HOME=/build
 RUN mkdir -p /build && \
     dnf install -y epel-release rpm-build rpmdevtools dnf-plugins-core 'dnf-command(builddep)' && \
     crb enable && rpmdev-setuptree && \
+    dnf install -y dwarves && \
     dnf download --source --destdir /tmp raspberrypi2-kernel4 && \
     rpm -i /tmp/raspberrypi2-*.src.rpm && \
     dnf builddep -y /build/rpmbuild/SPECS/raspberrypi2.spec && \
     sed -i 's/^%define bcmmodel 2711/%define bcmmodel 2712/' /build/rpmbuild/SPECS/raspberrypi2.spec && \
+    printf '%s\n' \
+      './scripts/config --file .config --disable DEBUG_INFO_NONE --enable DEBUG_KERNEL --enable DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT --enable DEBUG_INFO_BTF --disable DEBUG_INFO_BTF_MODULES' \
+      'make olddefconfig' \
+      'grep -q "^CONFIG_DEBUG_INFO_BTF=y" .config || { echo "BTF not enabled in .config" >&2; exit 1; }' \
+      > /tmp/btf.inc && \
+    sed -i '/^make bcm%{bcmmodel}_defconfig/r /tmp/btf.inc' /build/rpmbuild/SPECS/raspberrypi2.spec && \
+    grep -q 'DEBUG_INFO_BTF' /build/rpmbuild/SPECS/raspberrypi2.spec \
+  || { echo 'BTF insert failed'; exit 1; } && \
     rpmspec -P /build/rpmbuild/SPECS/raspberrypi2.spec | grep -q 'make bcm2712_defconfig' \
   || { echo 'bcmmodel override failed'; exit 1; } && \
     rpmbuild -bb /build/rpmbuild/SPECS/raspberrypi2.spec \
