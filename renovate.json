@@ -20,7 +20,7 @@
     },
     {
       "matchUpdateTypes": ["digest"],
-      "automerge": false
+      "automerge": true
     }
   ],
   "timezone": "America/Chicago"
