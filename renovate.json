@@ -14,8 +14,7 @@
   "packageRules": [
     {
       "matchDatasources": ["docker"],
-      "matchPackageNames": ["quay.io/almalinuxorg/almalinux-bootc-rpi"],
-      "schedule": ["* 2-5 * * 1-5"],
+      "matchPackageNames": ["quay.io/almalinuxorg/almalinux-bootc-rpi"]
       "groupName": "AlmaLinux bootc RPi base image"
     },
     {
