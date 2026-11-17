@@ -1,4 +1,4 @@
-FROM quay.io/almalinuxorg/almalinux-bootc-rpi:10@sha256:ae36478ffb81034a5a582b83971ef428b18094f01495abc28efbf193bca1a747 AS builder
+FROM quay.io/almalinuxorg/almalinux-bootc-rpi:10@sha256:57656faaa7fdc8ee1256389f03899c3d2d000fb09a5383de9e8eb26854974e9c AS builder
 # bootc rpi image has /root as a file not a dir; use /build as HOME instead
 ENV HOME=/build
 RUN mkdir -p /build && \
